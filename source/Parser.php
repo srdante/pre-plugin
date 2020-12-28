@@ -6,16 +6,16 @@ use Exception;
 use Yay\Engine;
 
 define(
-    "COMMENT",
-    trim("
+    'COMMENT',
+    trim('
 // This file is generated and changes you make will be lost.
 // Change %s instead.
-")
+')
 );
 
 class Parser
 {
-    private $macros = [];
+    private $macros    = [];
     private $compilers = [];
 
     public function addMacro($macro)
@@ -88,20 +88,15 @@ class Parser
 
     public function process($from, $to = null, $format = true, $comment = true)
     {
-        if (is_null($to)) {
-            $to = preg_replace("/\.[a-zA-Z]+$/", ".php", $from);
+        if (null === $to) {
+            $to = preg_replace('/\\.[a-zA-Z]+$/', '.php', $from);
         }
 
-        if (!$this->isProcessed($from, $to)) {
+        if (! $this->isProcessed($from, $to)) {
             $this->compile($from, $to);
         }
 
         return require $to;
-    }
-
-    private function isProcessed($from, $to)
-    {
-        return file_exists($to) && filemtime($from) < filemtime($to);
     }
 
     public function compile($from, $to, $format = true, $comment = true)
@@ -117,7 +112,7 @@ class Parser
             if ($comment) {
                 $comment = sprintf(COMMENT, $from);
 
-                $code = str_replace("<?php", "<?php\n\n{$comment}", $code);
+                $code = str_replace('<?php', "<?php\n\n{$comment}", $code);
             }
 
             file_put_contents($to, $code);
@@ -132,6 +127,43 @@ class Parser
         $engine = new Engine();
 
         return $engine->expand($code, $engine->currentFileName(), Engine::GC_ENGINE_DISABLED);
+    }
+
+    public function format($code)
+    {
+        $path    = __DIR__;
+        $code    = $this->addOpeningTag(trim($code));
+        $encoded = base64_encode($code);
+
+        $command = "node -e '
+            const atob = require(\"atob\")
+            const prettier = require(\"prettier\")
+
+            prettier.resolveConfig(\"{$path}\").then(options => {
+                try {
+                    const formatted = prettier.format(atob(\"{$encoded}\").trim(), options)
+                    console.log(formatted)
+                } catch (e) {}
+            })
+        '";
+
+        $cwd = getcwd();
+        chdir(__DIR__);
+        exec($command, $output);
+        chdir($cwd);
+
+        if (! $output) {
+            return $code;
+        }
+
+        $output = join("\n", $output);
+
+        return $this->addOpeningTag($output) . "\n";
+    }
+
+    private function isProcessed($from, $to)
+    {
+        return file_exists($to) && filemtime($from) < filemtime($to);
     }
 
     private function getCodeWithCompilers($code)
@@ -153,46 +185,15 @@ class Parser
 
         foreach ($macros as $macro) {
             if (file_exists($macro)) {
-                $code = str_replace("<?php", file_get_contents($macro), $code);
+                $code = str_replace('<?php', file_get_contents($macro), $code);
             }
         }
 
         return $code;
     }
 
-    public function format($code)
-    {
-        $path = __DIR__;
-        $code = $this->addOpeningTag(trim($code));
-        $encoded = base64_encode($code);
-
-        $command = "node -e '
-            const atob = require(\"atob\")
-            const prettier = require(\"prettier\")
-
-            prettier.resolveConfig(\"{$path}\").then(options => {
-                try {
-                    const formatted = prettier.format(atob(\"{$encoded}\").trim(), options)
-                    console.log(formatted)
-                } catch (e) {}
-            })
-        '";
-
-        $cwd = getcwd();
-        chdir(__DIR__);
-        exec($command, $output);
-        chdir($cwd);
-
-        if (!$output) {
-            return $code;
-        }
-
-        $output = join("\n", $output);
-        return $this->addOpeningTag($output) . "\n";
-    }
-
     private function addOpeningTag($code)
     {
-        return "<?php" . preg_replace("/^\<\?php/", "", trim($code));
+        return '<?php' . preg_replace('/^\\<\\?php/', '', trim($code));
     }
 }

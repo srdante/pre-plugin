@@ -27,29 +27,37 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     private $io;
 
     /**
-     * @param Composer $composer
+     * @param Composer    $composer
      * @param IOInterface $io
      */
     public function activate(Composer $composer, IOInterface $io)
     {
         $this->composer = $composer;
-        $this->io = $io;
+        $this->io       = $io;
 
         $composer
             ->getInstallationManager()
             ->addInstaller(new Installer($io, $composer));
     }
 
+    public function deactivate(Composer $composer, IOInterface $io)
+    {
+    }
+
+    public function uninstall(Composer $composer, IOInterface $io)
+    {
+    }
+
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      *
      * @return array
      */
     public static function getSubscribedEvents()
     {
         return [
-            "pre-autoload-dump" => [
-                "onPreAutoloadDump",
+            'pre-autoload-dump' => [
+                'onPreAutoloadDump',
             ],
         ];
     }
@@ -69,7 +77,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         if ($shouldOptimize) {
             file_put_contents($lockPath, time());
 
-            if (!file_exists("{$basePath}/vendor/autoload.php")) {
+            if (! file_exists("{$basePath}/vendor/autoload.php")) {
                 return;
             }
 
@@ -86,12 +94,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                     continue;
                 }
 
-                if ($file->getExtension() !== "pre") {
+                if ($file->getExtension() !== 'pre') {
                     continue;
                 }
 
                 $pre = $file->getPathname();
-                $php = preg_replace("/pre$/", "php", $pre);
+                $php = preg_replace('/pre$/', 'php', $pre);
 
                 compile(
                     $pre, $php, $format = true, $comment = false
@@ -99,7 +107,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             }
         } else {
             if (file_exists($lockPath)) {
-                unlink($basePath . "/pre.lock");
+                unlink($basePath . '/pre.lock');
             }
         }
     }
@@ -114,7 +122,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     private function getBasePath(Event $event)
     {
         $config = $event->getComposer()->getConfig();
-        return realpath($config->get("vendor-dir") . "/../");
+
+        return realpath($config->get('vendor-dir') . '/../');
     }
 
     /**
@@ -131,18 +140,18 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         // I will surely burn for this.
 
-        $class = new ReflectionClass(ConsoleIO::class);
-        $property = $class->getProperty("input");
+        $class    = new ReflectionClass(ConsoleIO::class);
+        $property = $class->getProperty('input');
         $property->setAccessible(true);
 
         $input = $property->getValue($io);
 
-        if ($input->hasOption("optimize")) {
-            return $input->getOption("optimize");
+        if ($input->hasOption('optimize')) {
+            return $input->getOption('optimize');
         }
 
-        if ($input->hasOption("optimize-autoloader")) {
-            return $input->getOption("optimize-autoloader");
+        if ($input->hasOption('optimize-autoloader')) {
+            return $input->getOption('optimize-autoloader');
         }
 
         return false;
